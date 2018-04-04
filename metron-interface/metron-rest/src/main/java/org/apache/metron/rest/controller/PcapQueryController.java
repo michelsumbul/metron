@@ -43,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.apache.metron.rest.service.impl.PcapQueryServiceImpl;
 import org.apache.metron.rest.util.PcapQueryResult;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 
@@ -145,24 +146,15 @@ public class PcapQueryController {
     @ApiResponses({
         @ApiResponse(message = "Return pcap object containing packets", code = 200)
     })
-    @RequestMapping(value = "/pcapqueryfilterasync", method = RequestMethod.GET)
+    @RequestMapping(value = "/pcapqueryfilterasync", method = RequestMethod.POST)
     public DeferredResult<ResponseEntity> getPcapsByIdentifiersDeferred(
-            @RequestParam(value = "pcaprequest") PcapRequest pcapRequest
+            @RequestBody PcapRequest pcapRequest
     ) throws RestException, IOException {
 
         DeferredResult<ResponseEntity> deferred = new DeferredResult<>();
         new Thread(() -> {
             try {
-             /*   if (!isValidPort(srcPort)) {
-                    return Response.serverError().status(Response.Status.NO_CONTENT)
-                            .entity("'srcPort' must not be null, empty or a non-integer").build();
-                }
-                
-                if (!isValidPort(dstPort)) {
-                    return Response.serverError().status(Response.Status.NO_CONTENT)
-                            .entity("'dstPort' must not be null, empty or a non-integer").build();
-                }
-*/
+
                 Map<String, String> query = new HashMap<String, String>() {
                     {
                         if (pcapRequest.getSrcIp() != null) {
