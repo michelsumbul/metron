@@ -18,51 +18,60 @@
 package org.apache.metron.rest.config;
 
 import org.apache.hadoop.conf.Configuration;
-import org.springframework.context.annotation.Bean;
-
-
-
-
-
 
 /**
  * utility class for this module which loads commons configuration to fetch
  * properties from underlying resources to communicate with HDFS.
- * 
+ *
  */
-@org.springframework.context.annotation.Configuration
 public class PcapConfig {
 
-	private static Configuration propConfiguration = null;
+    private Configuration propConfiguration = null;
 
+    /**
+     * Loads configuration resources
+     *
+     * @return Configuration
+     *
+     */
+    public PcapConfig() {
+        propConfiguration = new Configuration();
+        propConfiguration.set("pcap.output.path", "/tmp");
+        propConfiguration.set("pcap.source.path", "/apps/metron/pcap");
+        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/mapred-site.xml");
+        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/yarn-site.xml");
+        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/core-site.xml");
+        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/hdfs-site.xml");
+         
+    }
 
-	/**
-	 * Loads configuration resources 
-	 * @return Configuration
-	 */
-        @Bean
-	public synchronized static Configuration getConfiguration() {
-		if(propConfiguration == null){
-			propConfiguration = new Configuration();
-		}
-		return propConfiguration;
-	}
+    public Configuration getConfiguration() {
+        
+        return this.propConfiguration;
+    }
 
-	public static String getPcapOutputPath() {
-		return getConfiguration().get("pcap.output.path");
-	}
+    public String getPcapOutputPath() {
+        return getConfiguration().get("pcap.output.path");
+    }
 
-	public static void setPcapOutputPath(String path) {
-		getConfiguration().set("pcap.output.path", path);
-	}
+    public void setPcapOutputPath(String path) {
+        getConfiguration().set("pcap.output.path", path);
+    }
 
-	public static String getTempQueryOutputPath() {
-		return getConfiguration().get("temp.query.output.path");
-	}
-	public static void setTempQueryOutputPath(String path) {
-		getConfiguration().set("temp.query.output.path", path);
-	}
+    public String getTempQueryOutputPath() {
+        return getConfiguration().get("temp.query.output.path");
+    }
 
+    public void setTempQueryOutputPath(String path) {
+        getConfiguration().set("temp.query.output.path", path);
+    }
 
+    public String getPcapSourcePath() {
+        return getConfiguration().get("pcap.source.path");
+    }
+
+    public void setPcapSourcePath(String path) {
+        getConfiguration().set("pcap.source.path", path);
+    }
 
 }
