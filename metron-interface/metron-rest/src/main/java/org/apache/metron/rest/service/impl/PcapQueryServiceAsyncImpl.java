@@ -42,7 +42,7 @@ public class PcapQueryServiceAsyncImpl {
 
         @Override
         protected Configuration initialValue() {
-            Configuration config = PcapConfig.getConfiguration();
+            Configuration config = new PcapConfig().getConfiguration();
             
             return config;
         }
@@ -73,16 +73,19 @@ public class PcapQueryServiceAsyncImpl {
             //convert to nanoseconds since the epoch
             startTime = TimestampConverters.MILLISECONDS.toNanoseconds(startTime);
             endTime = TimestampConverters.MILLISECONDS.toNanoseconds(endTime);
-            //LOGGER.debug("Query received: {}", query);
-
-            results = getQueryUtil().query(new org.apache.hadoop.fs.Path(PcapConfig.getPcapOutputPath()),
-                     new org.apache.hadoop.fs.Path(PcapConfig.getTempQueryOutputPath()),
+            System.out.println("Query received: {}"+ query);
+            System.out.println("Configuration");
+            System.out.println(CONFIGURATION.get());
+            PcapConfig pcapConfig = new PcapConfig();
+            System.out.println("Configuration mapreduce.framework.name " + pcapConfig.getConfiguration().get("mapreduce.framework.name"));
+            results = getQueryUtil().query(new org.apache.hadoop.fs.Path(pcapConfig.getPcapSourcePath()),
+                     new org.apache.hadoop.fs.Path(pcapConfig.getPcapOutputPath()),
                      startTime,
                      endTime,
                      numReducers,
                      query,
-                     CONFIGURATION.get(),
-                     FileSystem.get(CONFIGURATION.get()),
+                     pcapConfig.getConfiguration(),
+                     FileSystem.get(pcapConfig.getConfiguration()),
                      new FixedPcapFilter.Configurator()
             );
             response.setPcaps(results != null ? Lists.newArrayList(results) : null);
