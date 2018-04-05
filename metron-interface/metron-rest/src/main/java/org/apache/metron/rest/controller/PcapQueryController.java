@@ -92,7 +92,10 @@ public class PcapQueryController {
     ) throws RestException, IOException {
 
         pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
-
+        
+        if(!t.getStatus().equals("Finished")){
+            return new ResponseEntity<>(new PcapsResponse(), HttpStatus.PROCESSING);
+        }
         if(t == null){
             return new ResponseEntity<>(new PcapsResponse(), HttpStatus.NOT_FOUND);
         }
