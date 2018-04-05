@@ -99,4 +99,64 @@ public class PcapQueryServiceAsyncImpl {
         }
         return new ResponseEntity<>(response.getPcaps(), HttpStatus.OK);
     }
+    
+     public PcapsResponse getPcapsByIdentifiersAsync(Map<String, String> query, long startTime, long endTime, int numReducers) throws IOException, RestException {
+        PcapsResponse response = new PcapsResponse();
+        SequenceFileIterable results = null;
+        try {
+            if (startTime < 0) {
+                startTime = 0L;
+            }
+            if (endTime < 0) {
+                endTime = System.currentTimeMillis();
+            }
+            
+            //convert to nanoseconds since the epoch
+            startTime = TimestampConverters.MILLISECONDS.toNanoseconds(startTime);
+            endTime = TimestampConverters.MILLISECONDS.toNanoseconds(endTime);
+            System.out.println("Query received: {}"+ query);
+            System.out.println("Configuration");
+            System.out.println(CONFIGURATION.get());
+            PcapConfig pcapConfig = new PcapConfig();
+            System.out.println("Configuration mapreduce.framework.name " + pcapConfig.getConfiguration().get("mapreduce.framework.name"));
+            System.out.println("Debug: We are going to call getQueryUtil().query in class pcapqueryserviceasyncimpl ");
+            System.out.println("Debug: source path: " + pcapConfig.getPcapSourcePath());
+            System.out.println("Debug: destination path: " + pcapConfig.getPcapOutputPath());
+            PcapJob j = new PcapJob();
+            results = j.query(new org.apache.hadoop.fs.Path(pcapConfig.getPcapSourcePath()),
+                     new org.apache.hadoop.fs.Path(pcapConfig.getPcapOutputPath()),
+                     startTime,
+                     endTime,
+                     numReducers,
+                     query,
+                     pcapConfig.getConfiguration(),
+                     FileSystem.get(pcapConfig.getConfiguration()),
+                     new FixedPcapFilter.Configurator()
+            );
+             /*
+            results = getQueryUtil().query(new org.apache.hadoop.fs.Path(pcapConfig.getPcapSourcePath()),
+                     new org.apache.hadoop.fs.Path(pcapConfig.getPcapOutputPath()),
+                     startTime,
+                     endTime,
+                     numReducers,
+                     query,
+                     pcapConfig.getConfiguration(),
+                     FileSystem.get(pcapConfig.getConfiguration()),
+                     new FixedPcapFilter.Configurator()
+            );
+            */
+            System.out.println("Debug: We finished the method getQueryUtil().query in class pcapqueryserviceasyncimpl ");
+            System.out.println("Debug query function next line");
+            response.setPcaps(results != null ? Lists.newArrayList(results) : null);
+        } catch (Exception e) {
+            System.err.println(e);
+            throw new RestException(e);
+
+        } finally {
+            if (null != results) {
+                results.cleanup();
+            }
+        }
+        return response;
+    }
 }
