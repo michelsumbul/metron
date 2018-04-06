@@ -15,6 +15,8 @@
  */
 package org.apache.metron.rest.util;
 
+import com.google.common.collect.Lists;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.logging.Logger;
 import org.apache.metron.common.Constants;
 import org.apache.metron.pcap.PcapHelper;
 import org.apache.metron.rest.RestException;
+import org.apache.metron.rest.config.PcapConfig;
 import org.apache.metron.rest.model.PcapRequest;
 import org.apache.metron.rest.service.impl.PcapQueryServiceAsyncImpl;
 import org.apache.metron.rest.util.PcapsResponse;
@@ -43,7 +46,7 @@ public class pcapQueryThread extends Thread {
     private PcapRequest pcapRequest;
 
     public pcapQueryThread(PcapRequest pcapRequest) {
-
+System.out.println("we are in method crete thread");
         this.submitTime = getCurrentNanoTime();
         this.pcapRequest = pcapRequest;
         this.idQuery = "pcapQuery_" + String.valueOf(getSubmitTime());
@@ -55,6 +58,15 @@ public class pcapQueryThread extends Thread {
 
         System.out.println("Pcap Thread is running");
         setStatus("Running");
+
+        //  runJobWithPcapJob();
+        runQueryFromCliLinuxProcess();
+        setStatus("Finished");
+        setEndTime(getCurrentNanoTime());
+
+    }
+
+    private void runJobWithPcapJob() {
         try {
             Map<String, String> query = new HashMap<String, String>() {
                 {
@@ -81,14 +93,19 @@ public class pcapQueryThread extends Thread {
             };
             PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
             System.out.println("Debug: We are going to call queryAsync.getPcapsByIdentifiersAsync ");
-            setPcapsReponse(queryAsync.getPcapsByIdentifiersAsync(query, pcapRequest.getStartTime(), pcapRequest.getEndTime(), pcapRequest.getNumReducers()));
+            PcapConfig pcapConfig = new PcapConfig();
+            pcapConfig.setPcapOutputPath("/tmp/" + this.getIdQuery());
+            setPcapsReponse(queryAsync.getPcapsByIdentifiersAsync(query, pcapRequest.getStartTime(), pcapRequest.getEndTime(), pcapRequest.getNumReducers(), pcapConfig));
         } catch (IOException ex) {
             Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
         } catch (RestException ex) {
             Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
         }
-        setStatus("Finished");
-        setEndTime(getCurrentNanoTime());
+    }
+
+    private void runQueryFromCliLinuxProcess() {
+        PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
+        setPcapsReponse(queryAsync.getPcapsLinuxProcess(pcapRequest, idQuery));
 
     }
 
@@ -105,8 +122,8 @@ public class pcapQueryThread extends Thread {
         }
         return null;
     }
-    
-    public static List<String> getListQueries(List<pcapQueryThread> lPcap){
+
+    public static List<String> getListQueries(List<pcapQueryThread> lPcap) {
         List<String> lQueries = new ArrayList<>();
         for (pcapQueryThread t : lPcap) {
             lQueries.add(t.getIdQuery());
