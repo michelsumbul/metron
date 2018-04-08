@@ -253,7 +253,8 @@ public class PcapQueryServiceAsyncImpl {
 
     private SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs) throws IOException {
         List<Path> files = new ArrayList<>();
-        for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
+        //for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
+            for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
             Path p = it.next().getPath();
             if (p.getName().equals("_SUCCESS")) {
                 fs.delete(p, false);
