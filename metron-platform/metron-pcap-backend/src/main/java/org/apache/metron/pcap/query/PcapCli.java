@@ -173,13 +173,15 @@ public class PcapCli {
     } catch (IOException e) {
       LOGGER.error("Unable to write file", e);
       return -1;
-    } finally {
+    } 
+    /*finally {
       try {
-        results.cleanup();
+      //  results.cleanup();
       } catch(IOException e) {
         LOGGER.warn("Unable to cleanup files in HDFS", e);
       }
-    }
+
+    }*/
     return 0;
   }
 
