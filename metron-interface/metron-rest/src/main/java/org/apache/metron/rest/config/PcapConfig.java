@@ -38,10 +38,10 @@ public class PcapConfig {
         propConfiguration = new Configuration();
         propConfiguration.set("pcap.output.path", "/tmp");
         propConfiguration.set("pcap.source.path", "/apps/metron/pcap");
-        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/mapred-site.xml");
-        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/yarn-site.xml");
-        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/core-site.xml");
-        propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/hdfs-site.xml");
+       // propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/mapred-site.xml");
+       // propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/yarn-site.xml");
+       // propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/core-site.xml");
+       // propConfiguration.addResource("/usr/hdp/current/hadoop-client/conf/hdfs-site.xml");
          
     }
 
