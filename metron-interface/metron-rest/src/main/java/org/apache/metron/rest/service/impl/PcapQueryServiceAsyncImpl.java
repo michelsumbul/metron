@@ -16,6 +16,7 @@
 package org.apache.metron.rest.service.impl;
 
 import com.google.common.collect.Lists;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,9 +40,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.apache.metron.rest.model.PcapRequest;
 import java.io.File;
-import java.nio.file.FileSystems;
+import java.io.InputStreamReader;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static org.apache.metron.rest.util.usefullFunctions.getAllFiles;
+import static org.apache.metron.rest.util.usefullFunctions.getCommandList;
 
 /**
  *
@@ -243,6 +246,64 @@ public class PcapQueryServiceAsyncImpl {
         return response;
     }
 
+    public String getPcapsLinuxProcessAsync(PcapRequest pcapRequest, String idQuery) {
+        SequenceFileIterable results = null;
+        Runtime rt = Runtime.getRuntime();
+        PcapsResponse response = new PcapsResponse();
+
+        String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
+
+        if (!pcapRequest.getSrcIp().isEmpty()) {
+            cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
+        }
+        if (!pcapRequest.getSrcPort().isEmpty()) {
+            cmdToExec = cmdToExec + " --ip_src_port " + pcapRequest.getSrcPort();
+        }
+        if (!pcapRequest.getDstIp().isEmpty()) {
+            cmdToExec = cmdToExec + " --ip_dst_addr " + pcapRequest.getDstIp();
+        }
+        if (!pcapRequest.getDstPort().isEmpty() && Long.valueOf(pcapRequest.getDstPort()) > 0) {
+            cmdToExec = cmdToExec + " --ip_dst_port " + pcapRequest.getDstPort();
+        }
+
+        if (!pcapRequest.getProtocol().isEmpty()) {
+            cmdToExec = cmdToExec + " --protocol " + pcapRequest.getProtocol();
+        }
+
+        cmdToExec = cmdToExec + " -st " + pcapRequest.getStartTime() + " -bop /tmp/" + idQuery + " >>/tmp/log/pcapjob 2>&1";
+
+        // rt.exec(cmdToExec);
+        String workingDir = "/tmp/" + idQuery;
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+
+            Process process;
+            List<String> lCmd = getCommandList("mkdir " + workingDir);
+            System.out.println(lCmd);
+            pb.command(lCmd);
+            process = pb.start();
+            process.waitFor();
+            pb.directory(new File(workingDir));
+
+            lCmd = getCommandList(cmdToExec);
+            System.out.println(lCmd);
+            pb.command(lCmd);
+
+            process = pb.start();
+            BufferedReader subProcessInputReader
+                    = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String jobId = null;
+            while ((jobId = subProcessInputReader.readLine()) != null) {
+                return jobId;
+            }
+        } catch (IOException | InterruptedException ex) {
+            Logger.getLogger(PcapQueryServiceAsyncImpl.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        return "Error in get the jobID of the mapreduce pcap search program.";
+    }
+
     private SequenceFileIterable readResults(String outputPath, Configuration config) throws IOException {
         List<Path> files = new ArrayList<>();
         files = getAllFiles(new File(outputPath));
@@ -254,7 +315,7 @@ public class PcapQueryServiceAsyncImpl {
     private SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs) throws IOException {
         List<Path> files = new ArrayList<>();
         //for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
-            for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
+        for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
             Path p = it.next().getPath();
             if (p.getName().equals("_SUCCESS")) {
                 fs.delete(p, false);
@@ -267,28 +328,4 @@ public class PcapQueryServiceAsyncImpl {
         return new SequenceFileIterable(files, config);
     }
 
-    private static List<Path> getAllFiles(File curDir) {
-        System.out.println("We are in list files");
-        List<Path> listFiles = new ArrayList<>();
-        File[] filesList = curDir.listFiles();
-        for (File f : filesList) {
-
-            if (f.isFile()) {
-                System.out.println(f.getAbsolutePath());
-                listFiles.add(new Path(f.getAbsolutePath()));
-            }
-        }
-        return listFiles;
-    }
-
-    private List<String> getCommandList(String cmd) {
-        List<String> lCmd = new ArrayList<>();
-        String[] cmdSplit = cmd.split(" ");
-
-        for (int i = 0; i < cmdSplit.length; i++) {
-            lCmd.add(cmdSplit[i]);
-
-        }
-        return lCmd;
-    }
 }
