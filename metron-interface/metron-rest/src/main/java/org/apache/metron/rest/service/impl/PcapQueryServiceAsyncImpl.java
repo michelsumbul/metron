@@ -191,10 +191,11 @@ public class PcapQueryServiceAsyncImpl {
 
     public PcapsResponse getPcapsLinuxProcess(PcapRequest pcapRequest, String idQuery) {
         SequenceFileIterable results = null;
-        Runtime rt = Runtime.getRuntime();
+      
         PcapsResponse response = new PcapsResponse();
 
-        String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
+        //String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
+        String cmdToExec = "$METRON_HOME/bin/pcap_query.sh fixed";
 
         if (!pcapRequest.getSrcIp().isEmpty()) {
             cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
@@ -212,6 +213,11 @@ public class PcapQueryServiceAsyncImpl {
         if (!pcapRequest.getProtocol().isEmpty()) {
             cmdToExec = cmdToExec + " --protocol " + pcapRequest.getProtocol();
         }
+        /*
+        if(pcapRequest.getEndTime() >0){
+            cmdToExec = cmdToExec + " -et " + pcapRequest.getEndTime();
+        }
+      */
 
         cmdToExec = cmdToExec + " -st " + pcapRequest.getStartTime() + " -bop /tmp/" + idQuery + " >>/tmp/log/pcapjob 2>&1";
 
@@ -248,10 +254,9 @@ public class PcapQueryServiceAsyncImpl {
 
     public String getPcapsLinuxProcessAsync(PcapRequest pcapRequest, String idQuery) {
         SequenceFileIterable results = null;
-        Runtime rt = Runtime.getRuntime();
-        PcapsResponse response = new PcapsResponse();
+       
 
-        String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
+        String cmdToExec = "$METRON_HOME/bin/pcap_query.sh fixed";
 
         if (!pcapRequest.getSrcIp().isEmpty()) {
             cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
@@ -302,6 +307,11 @@ public class PcapQueryServiceAsyncImpl {
         }
 
         return "Error in get the jobID of the mapreduce pcap search program.";
+    }
+    
+    private String getMapReduceStatus(String jobId){
+        
+        return null;
     }
 
     private SequenceFileIterable readResults(String outputPath, Configuration config) throws IOException {
