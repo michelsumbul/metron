@@ -106,6 +106,32 @@ public class PcapQueryController {
         return new ResponseEntity<>(t.getPcapsReponse(), HttpStatus.OK);
     }
 
+        @ApiOperation(value = "Get the result of a pcap query in a Json format")
+    @ApiResponses({
+        @ApiResponse(message = "Return the result of the query running on the backend in a JSON format", code = 200)
+    })
+    @RequestMapping(value = "/pcapqueryfilterasync/resultJson", method = RequestMethod.POST)
+    public ResponseEntity<String> getAsyncPcapQueryResultInJson(@RequestParam(value = "idQuery") String idQuery
+    ) throws RestException, IOException {
+
+        pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
+        
+        if(!t.getStatus().equals("Finished")){
+            return new ResponseEntity<>("", HttpStatus.PROCESSING);
+        }
+        if(t == null){
+            return new ResponseEntity<>("", HttpStatus.NOT_FOUND);
+        }
+        
+        
+        if(t !=null & t.getStatus().equals("Finished") & t.getLocalPcapFile() != null ){
+            return new ResponseEntity<>(t.pdmlToJson(), HttpStatus.OK);
+        }
+        
+        return new ResponseEntity<>("Error in the result collection.", HttpStatus.BAD_REQUEST);
+        
+    }
+    
     @ApiOperation(value = "Clear query")
     @ApiResponses({
         @ApiResponse(message = "Clear the result of the query on backendside", code = 200)
