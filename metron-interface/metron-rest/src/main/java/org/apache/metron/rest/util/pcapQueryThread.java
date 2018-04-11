@@ -15,9 +15,13 @@
  */
 package org.apache.metron.rest.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import org.apache.hadoop.fs.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +35,11 @@ import org.apache.metron.rest.config.PcapConfig;
 import org.apache.metron.rest.model.PcapRequest;
 import org.apache.metron.rest.service.impl.PcapQueryServiceAsyncImpl;
 import org.apache.metron.rest.util.PcapsResponse;
+//import org.codehaus.jackson.JsonNode;
+//import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.metron.rest.util.usefullFunctions;
+import static org.apache.metron.rest.util.usefullFunctions.getCommandList;
+import static org.apache.metron.rest.util.usefullFunctions.getCurrentNanoTime;
 
 /**
  *
@@ -39,17 +48,21 @@ import org.apache.metron.rest.util.PcapsResponse;
 public class pcapQueryThread extends Thread {
 
     private String idQuery;
+    private String jobId;
     private String status;
     private long submitTime;
     private long endTime;
     private PcapsResponse pcapsReponse;
     private PcapRequest pcapRequest;
+    private String pdml;
+    private Path localPcapFile;
 
     public pcapQueryThread(PcapRequest pcapRequest) {
-System.out.println("we are in method crete thread");
+        System.out.println("we are in method crete thread");
         this.submitTime = getCurrentNanoTime();
         this.pcapRequest = pcapRequest;
         this.idQuery = "pcapQuery_" + String.valueOf(getSubmitTime());
+
         this.status = "Created";
 
     }
@@ -61,8 +74,10 @@ System.out.println("we are in method crete thread");
 
         //  runJobWithPcapJob();
         runQueryFromCliLinuxProcess();
+
+        //Path pcapFile = getLocalPcapFile();
         setStatus("Finished");
-        setEndTime(getCurrentNanoTime());
+        setEndTime(usefullFunctions.getCurrentNanoTime());
 
     }
 
@@ -107,10 +122,20 @@ System.out.println("we are in method crete thread");
         PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
         setPcapsReponse(queryAsync.getPcapsLinuxProcess(pcapRequest, idQuery));
 
+        List<Path> lPath = usefullFunctions.getAllFiles(new File("/tmp/" + this.idQuery));
+        if (!lPath.isEmpty() && lPath != null) {
+            this.localPcapFile = lPath.get(0);
+            System.out.println("the local pcap file: " + this.localPcapFile.toString());
+            pcapToPDML(this.localPcapFile);
+        } else {
+            this.localPcapFile = null;
+        }
+
     }
 
-    private long getCurrentNanoTime() {
-        return System.nanoTime();
+    private void runQueryFromCliLinuxProcessAsynnc() {
+        PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
+        this.setJobId(queryAsync.getPcapsLinuxProcessAsync(pcapRequest, idQuery));
     }
 
     public static pcapQueryThread findQueryInList(List<pcapQueryThread> lPcap, String idQuery) {
@@ -129,6 +154,49 @@ System.out.println("we are in method crete thread");
             lQueries.add(t.getIdQuery());
         }
         return lQueries;
+    }
+
+    private void pcapToPDML(Path pcapFile) {
+
+        if (pcapFile != null) {
+            try {
+                String cmd;
+                ProcessBuilder pb = new ProcessBuilder();
+                Process process;
+                //cmd = "tshark -r " + pcapFile.toString() + " -T pdml >" + this.idQuery + ".pdml";
+                cmd = "/usr/sbin/tshark -r " + pcapFile.toString() + " -T pdml";
+                System.out.println(cmd);
+                List<String> lCmd = getCommandList(cmd);
+                lCmd = getCommandList(cmd);
+                pb.directory(new File("/tmp/"+idQuery));
+                pb.command(lCmd);
+                pb.redirectOutput(new File(pcapFile.getParent().toString() + "/" + this.idQuery+".pdml"));
+                pb.redirectError(new File(pcapFile.getParent().toString() + "/" + this.idQuery+".error"));
+                process = pb.start();
+                process.waitFor();
+                process.destroy();
+
+            } catch (IOException | InterruptedException ex) {
+                Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    public String pdmlToJson() {
+
+        try {
+            File f = new File("/tmp/"+this.idQuery+"/"+idQuery+".pdml");
+            XmlMapper xmlMapper = new XmlMapper();
+
+            JsonNode node = xmlMapper.readTree(f);
+            ObjectMapper jsonMapper = new ObjectMapper();
+            String json = jsonMapper.writeValueAsString(node);
+            return json;
+
+        } catch (IOException ex) {
+            Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return "conversion error";
     }
 
     /**
@@ -213,5 +281,47 @@ System.out.println("we are in method crete thread");
      */
     public void setEndTime(long endTime) {
         this.endTime = endTime;
+    }
+
+    /**
+     * @return the pdml
+     */
+    public String getPdml() {
+        return pdml;
+    }
+
+    /**
+     * @param pdml the pdml to set
+     */
+    public void setPdml(String pdml) {
+        this.pdml = pdml;
+    }
+
+    /**
+     * @return the localPcapFile
+     */
+    public Path getLocalPcapFile() {
+        return localPcapFile;
+    }
+
+    /**
+     * @param localPcapFile the localPcapFile to set
+     */
+    public void setLocalPcapFile(Path localPcapFile) {
+        this.localPcapFile = localPcapFile;
+    }
+
+    /**
+     * @return the jobId
+     */
+    public String getJobId() {
+        return jobId;
+    }
+
+    /**
+     * @param jobId the jobId to set
+     */
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
     }
 }
