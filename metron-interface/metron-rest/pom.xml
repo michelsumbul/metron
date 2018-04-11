@@ -381,6 +381,13 @@ the specific language governing permissions and limitations under the License.
             <artifactId>org.eclipse.persistence.jpa</artifactId>
             <version>${eclipse.link.version}</version>
         </dependency>
+        
+              <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-xml</artifactId>
+                <version>${global_jackson_version}</version>
+            </dependency>
+
     </dependencies>
 
     <dependencyManagement>
@@ -403,6 +410,8 @@ the specific language governing permissions and limitations under the License.
                     </exclusion>
                 </exclusions>
             </dependency>
+            
+      
         </dependencies>
     </dependencyManagement>
 
