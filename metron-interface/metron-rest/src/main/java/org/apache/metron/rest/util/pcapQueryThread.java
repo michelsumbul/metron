@@ -152,6 +152,7 @@ public class pcapQueryThread extends Thread {
     }
 
     
+    
     public void downloadResultLocally() {  
          
         try {
