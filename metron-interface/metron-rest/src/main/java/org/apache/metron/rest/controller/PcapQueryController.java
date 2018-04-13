@@ -20,16 +20,9 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.metron.rest.RestException;
-import org.apache.metron.common.Constants;
-import org.apache.metron.pcap.PcapHelper;
 import org.apache.metron.rest.model.PcapRequest;
-import org.apache.metron.rest.service.impl.PcapQueryServiceAsyncImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -40,7 +33,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.context.request.async.DeferredResult;
 
 /**
  *
@@ -124,7 +116,8 @@ public class PcapQueryController {
         }
         
         
-        if(t !=null & t.getStatus().equals("Finished") & t.getLocalPcapFile() != null ){
+        if(t !=null & t.getStatus().equals("Finished") ){
+            t.downloadResultLocally();  //for complete async
             return new ResponseEntity<>(t.pdmlToJson(), HttpStatus.OK);
         }
         
@@ -158,51 +151,7 @@ public class PcapQueryController {
     }
 
    
-    @ApiOperation(value = "Submit a pcap job to found specific paquet")
-    @ApiResponses({
-        @ApiResponse(message = "Return pcap object containing packets", code = 200)
-    })
-    @RequestMapping(value = "/pcapqueryfilterasync", method = RequestMethod.POST)
-    public DeferredResult<ResponseEntity> getPcapsByIdentifiersDeferred(
-            @RequestBody PcapRequest pcapRequest
-    ) throws RestException, IOException {
 
-        DeferredResult<ResponseEntity> deferred = new DeferredResult<>();
-        new Thread(() -> {
-            try {
-
-                Map<String, String> query = new HashMap<String, String>() {
-                    {
-                        if (pcapRequest.getSrcIp() != null) {
-                            put(Constants.Fields.SRC_ADDR.getName(), pcapRequest.getSrcIp());
-                        }
-                        if (pcapRequest.getDstIp() != null) {
-                            put(Constants.Fields.DST_ADDR.getName(), pcapRequest.getDstIp());
-                        }
-                        if (pcapRequest.getSrcPort() != null) {
-                            put(Constants.Fields.SRC_PORT.getName(), pcapRequest.getSrcPort());
-                        }
-                        if (pcapRequest.getDstPort() != null) {
-                            put(Constants.Fields.DST_PORT.getName(), pcapRequest.getDstPort());
-                        }
-                        if (pcapRequest.getProtocol() != null) {
-                            put(Constants.Fields.PROTOCOL.getName(), pcapRequest.getProtocol());
-                        }
-                        put(Constants.Fields.INCLUDES_REVERSE_TRAFFIC.getName(), "" + pcapRequest.isIncludeReverseTraffic());
-                        if (!org.apache.commons.lang3.StringUtils.isEmpty(pcapRequest.getPacketFilter())) {
-                            put(PcapHelper.PacketFields.PACKET_FILTER.getName(), pcapRequest.getPacketFilter());
-                        }
-                    }
-                };
-                PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
-                deferred.setResult(queryAsync.getPcapsByIdentifiers(query, pcapRequest.getStartTime(), pcapRequest.getEndTime(), pcapRequest.getNumReducers()));
-            } catch (IOException | RestException ex) {
-                Logger.getLogger(PcapQueryController.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }).start();
-
-        return deferred;
-    }
 
     private static boolean isValidPort(String port) {
         if (port != null && !port.equals("")) {
