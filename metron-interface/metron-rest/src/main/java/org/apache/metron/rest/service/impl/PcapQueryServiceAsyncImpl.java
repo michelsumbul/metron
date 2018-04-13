@@ -70,6 +70,7 @@ public class PcapQueryServiceAsyncImpl {
         return queryUtil;
     }
 
+    
     public ResponseEntity getPcapsByIdentifiers(Map<String, String> query, long startTime, long endTime, int numReducers) throws IOException, RestException {
         PcapsResponse response = new PcapsResponse();
         SequenceFileIterable results = null;
@@ -260,7 +261,7 @@ public class PcapQueryServiceAsyncImpl {
         SequenceFileIterable results = null;
 
         String cmdToExec = "yarn jar /usr/hcp/current/metron/lib/metron-pcap-backend-0.4.1.1.4.1.0-18.jar org.apache.metron.pcap.query.pcapSearch ";
-
+        //Need to be changed by something dynamic depending on the environment
         if (!pcapRequest.getSrcIp().isEmpty()) {
             cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
         }
