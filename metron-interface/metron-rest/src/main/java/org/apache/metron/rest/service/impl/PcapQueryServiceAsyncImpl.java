@@ -15,6 +15,7 @@
  */
 package org.apache.metron.rest.service.impl;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -43,6 +44,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.metron.rest.util.ResultsWriter;
 import static org.apache.metron.rest.util.usefullFunctions.getAllFiles;
 import static org.apache.metron.rest.util.usefullFunctions.getCommandList;
 
@@ -191,11 +193,13 @@ public class PcapQueryServiceAsyncImpl {
 
     public PcapsResponse getPcapsLinuxProcess(PcapRequest pcapRequest, String idQuery) {
         SequenceFileIterable results = null;
-      
-        PcapsResponse response = new PcapsResponse();
 
-        //String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
-        String cmdToExec = "$METRON_HOME/bin/pcap_query.sh fixed";
+        PcapsResponse response = new PcapsResponse();
+        //  String metron_home = System.getenv("METRON_HOME");
+        //System.out.println(metron_home);
+
+        String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixed";
+        //String cmdToExec = metron_home+"/bin/pcap_query.sh fixed";
 
         if (!pcapRequest.getSrcIp().isEmpty()) {
             cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
@@ -213,11 +217,11 @@ public class PcapQueryServiceAsyncImpl {
         if (!pcapRequest.getProtocol().isEmpty()) {
             cmdToExec = cmdToExec + " --protocol " + pcapRequest.getProtocol();
         }
-        /*
+        
         if(pcapRequest.getEndTime() >0){
             cmdToExec = cmdToExec + " -et " + pcapRequest.getEndTime();
         }
-      */
+         
 
         cmdToExec = cmdToExec + " -st " + pcapRequest.getStartTime() + " -bop /tmp/" + idQuery + " >>/tmp/log/pcapjob 2>&1";
 
@@ -254,14 +258,13 @@ public class PcapQueryServiceAsyncImpl {
 
     public String getPcapsLinuxProcessAsync(PcapRequest pcapRequest, String idQuery) {
         SequenceFileIterable results = null;
-       
 
-        String cmdToExec = "$METRON_HOME/bin/pcap_query.sh fixed";
+        String cmdToExec = "yarn jar /usr/hcp/current/metron/lib/metron-pcap-backend-0.4.1.1.4.1.0-18.jar org.apache.metron.pcap.query.pcapSearch ";
 
         if (!pcapRequest.getSrcIp().isEmpty()) {
             cmdToExec = cmdToExec + " --ip_src_addr " + pcapRequest.getSrcIp();
         }
-        if (!pcapRequest.getSrcPort().isEmpty()) {
+        if (!pcapRequest.getSrcPort().isEmpty() && Long.valueOf(pcapRequest.getSrcPort()) > 0) {
             cmdToExec = cmdToExec + " --ip_src_port " + pcapRequest.getSrcPort();
         }
         if (!pcapRequest.getDstIp().isEmpty()) {
@@ -275,7 +278,11 @@ public class PcapQueryServiceAsyncImpl {
             cmdToExec = cmdToExec + " --protocol " + pcapRequest.getProtocol();
         }
 
-        cmdToExec = cmdToExec + " -st " + pcapRequest.getStartTime() + " -bop /tmp/" + idQuery + " >>/tmp/log/pcapjob 2>&1";
+        if (pcapRequest.getEndTime() > 0) {
+            cmdToExec = cmdToExec + " -et " + pcapRequest.getEndTime();
+        }
+
+        cmdToExec = cmdToExec + " -st " + pcapRequest.getStartTime() + " -bop /tmp/" + idQuery;
 
         // rt.exec(cmdToExec);
         String workingDir = "/tmp/" + idQuery;
@@ -308,12 +315,8 @@ public class PcapQueryServiceAsyncImpl {
 
         return "Error in get the jobID of the mapreduce pcap search program.";
     }
-    
-    private String getMapReduceStatus(String jobId){
-        
-        return null;
-    }
 
+    
     private SequenceFileIterable readResults(String outputPath, Configuration config) throws IOException {
         List<Path> files = new ArrayList<>();
         files = getAllFiles(new File(outputPath));
@@ -322,7 +325,8 @@ public class PcapQueryServiceAsyncImpl {
         return new SequenceFileIterable(files, config);
     }
 
-    private SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs) throws IOException {
+    public SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs) throws IOException {
+    
         List<Path> files = new ArrayList<>();
         //for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
         for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
@@ -336,6 +340,29 @@ public class PcapQueryServiceAsyncImpl {
 
         Collections.sort(files, (o1, o2) -> o1.getName().compareTo(o2.getName()));
         return new SequenceFileIterable(files, config);
+    }
+
+    public void writeLocally(SequenceFileIterable results, int numRecordsPerFile, Path outputFolder) {
+      ResultsWriter resultsWriter = new ResultsWriter();
+        try {
+
+            Iterable<List<byte[]>> partitions = Iterables.partition(results, numRecordsPerFile);
+            int part = 1;
+            if (partitions.iterator().hasNext()) {
+                for (List<byte[]> data : partitions) {
+                    String outFileName = outputFolder.toString() + "/" + String.format("pcap-data-%s+%04d.pcap", numRecordsPerFile, part++);
+                    if (data.size() > 0) {
+                        resultsWriter.write(data, outFileName);
+                    }
+                }
+            } else {
+                System.out.println("No results returned.");
+            }
+        } catch (IOException e) {
+         
+            Logger.getLogger(PcapQueryServiceAsyncImpl.class.getName()).log(Level.SEVERE, null, e);
+           
+        }
     }
 
 }
