@@ -125,6 +125,7 @@ public class PcapQueryController {
         
     }
     
+    
     @ApiOperation(value = "Clear query")
     @ApiResponses({
         @ApiResponse(message = "Clear the result of the query on backendside", code = 200)
