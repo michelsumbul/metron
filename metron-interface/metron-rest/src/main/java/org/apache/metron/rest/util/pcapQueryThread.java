@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import org.apache.hadoop.fs.Path;
 import java.util.ArrayList;
@@ -28,7 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.metron.common.Constants;
+import org.apache.metron.common.hadoop.SequenceFileIterable;
 import org.apache.metron.pcap.PcapHelper;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.config.PcapConfig;
@@ -40,6 +44,7 @@ import org.apache.metron.rest.util.PcapsResponse;
 import org.apache.metron.rest.util.usefullFunctions;
 import static org.apache.metron.rest.util.usefullFunctions.getCommandList;
 import static org.apache.metron.rest.util.usefullFunctions.getCurrentNanoTime;
+import org.springframework.core.env.Environment;
 
 /**
  *
@@ -47,6 +52,10 @@ import static org.apache.metron.rest.util.usefullFunctions.getCurrentNanoTime;
  */
 public class pcapQueryThread extends Thread {
 
+    /*
+    *The idQuery is not hte same as the jobId because it was the case we will have to wait until yarn send us 
+    *back the ID which might take several seconds and block the connection to the rest client
+     */
     private String idQuery;
     private String jobId;
     private String status;
@@ -56,6 +65,8 @@ public class pcapQueryThread extends Thread {
     private PcapRequest pcapRequest;
     private String pdml;
     private Path localPcapFile;
+    private Environment environment;
+    PcapQueryServiceAsyncImpl pcapQueryAsync;
 
     public pcapQueryThread(PcapRequest pcapRequest) {
         System.out.println("we are in method crete thread");
@@ -73,9 +84,11 @@ public class pcapQueryThread extends Thread {
         setStatus("Running");
 
         //  runJobWithPcapJob();
-        runQueryFromCliLinuxProcess();
+        //working external process sync
+         runQueryFromCliLinuxProcess();
+        //uncomment the following when we will have implemented to get dynamically the address of hte yarn server
+       // runQueryFromCliLinuxProcessAsynnc();
 
-        //Path pcapFile = getLocalPcapFile();
         setStatus("Finished");
         setEndTime(usefullFunctions.getCurrentNanoTime());
 
@@ -134,8 +147,29 @@ public class pcapQueryThread extends Thread {
     }
 
     private void runQueryFromCliLinuxProcessAsynnc() {
-        PcapQueryServiceAsyncImpl queryAsync = new PcapQueryServiceAsyncImpl();
-        this.setJobId(queryAsync.getPcapsLinuxProcessAsync(pcapRequest, idQuery));
+        pcapQueryAsync = new PcapQueryServiceAsyncImpl();
+        this.setJobId(pcapQueryAsync.getPcapsLinuxProcessAsync(pcapRequest, idQuery));
+    }
+
+    public void downloadResultLocally() {  
+        
+        try {
+            Configuration config = new Configuration();
+          SequenceFileIterable seqFile = pcapQueryAsync.readResults(new Path("/tmp/"+this.idQuery), config,FileSystem.get(config));
+          pcapQueryAsync.writeLocally(seqFile, 10,new Path( "/tmp/"+this.idQuery));
+        } catch (IOException ex) {
+            Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        List<Path> lPath = usefullFunctions.getAllFiles(new File("/tmp/" + this.idQuery));
+        if (!lPath.isEmpty() && lPath != null) {
+            this.localPcapFile = lPath.get(0);
+            System.out.println("the local pcap file: " + this.localPcapFile.toString());
+            pcapToPDML(this.localPcapFile);
+        } else {
+            this.localPcapFile = null;
+        }
+
     }
 
     public static pcapQueryThread findQueryInList(List<pcapQueryThread> lPcap, String idQuery) {
@@ -156,6 +190,18 @@ public class pcapQueryThread extends Thread {
         return lQueries;
     }
 
+    public static List<String> getListMRJobStatus() {
+
+        return null;
+    }
+
+    public String getMRJobHistoryStateRest() {
+
+        String state = usefullFunctions.getMRJobHistoryRestState("application_" + this.getJobId().replace("job_", ""));
+        this.setStatus(state);
+        return state;
+    }
+
     private void pcapToPDML(Path pcapFile) {
 
         if (pcapFile != null) {
@@ -168,10 +214,10 @@ public class pcapQueryThread extends Thread {
                 System.out.println(cmd);
                 List<String> lCmd = getCommandList(cmd);
                 lCmd = getCommandList(cmd);
-                pb.directory(new File("/tmp/"+idQuery));
+                pb.directory(new File("/tmp/" + idQuery));
                 pb.command(lCmd);
-                pb.redirectOutput(new File(pcapFile.getParent().toString() + "/" + this.idQuery+".pdml"));
-                pb.redirectError(new File(pcapFile.getParent().toString() + "/" + this.idQuery+".error"));
+                pb.redirectOutput(new File(pcapFile.getParent().toString() + "/" + this.idQuery + ".pdml"));
+                pb.redirectError(new File(pcapFile.getParent().toString() + "/" + this.idQuery + ".error"));
                 process = pb.start();
                 process.waitFor();
                 process.destroy();
@@ -185,10 +231,10 @@ public class pcapQueryThread extends Thread {
     public String pdmlToJson() {
 
         try {
-            File f = new File("/tmp/"+this.idQuery+"/"+idQuery+".pdml");
+            File f = new File("/tmp/" + this.idQuery + "/" + idQuery + ".pdml");
             XmlMapper xmlMapper = new XmlMapper();
 
-            JsonNode node = xmlMapper.readTree(f);
+            Pdml node = xmlMapper.readValue(new FileInputStream(f), Pdml.class);
             ObjectMapper jsonMapper = new ObjectMapper();
             String json = jsonMapper.writeValueAsString(node);
             return json;
