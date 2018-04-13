@@ -16,9 +16,20 @@
 package org.apache.metron.rest.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.hadoop.fs.Path;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 
 /**
  *
@@ -48,11 +59,38 @@ public class usefullFunctions {
         for (File f : filesList) {
 
             if (f.isFile()) {
-               // System.out.println(f.getAbsolutePath());
+                // System.out.println(f.getAbsolutePath());
                 listFiles.add(new Path(f.getAbsolutePath()));
             }
         }
         return listFiles;
     }
 
+    public static String getMRJobHistoryRest(String query) {
+
+        String resp = "Error";
+        try {
+            HttpHost target = new HttpHost("172.26.215.103", 8088, "http");
+            HttpClient httpClient = HttpClientBuilder.create().build();
+
+            // specify the get request
+            HttpGet getRequest = new HttpGet("");
+            HttpResponse httpResponse = httpClient.execute(target, getRequest);
+            HttpEntity entity = httpResponse.getEntity();
+            if (entity != null) {
+                resp = EntityUtils.toString(entity);
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(usefullFunctions.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return resp;
+    }
+
+    public static String getMRJobHistoryRestState(String jobId) {
+
+        String state = getMRJobHistoryRest("/ws/v1/cluster/apps/" + jobId + "/state");
+        state = state.split(":")[1];
+        state = state.replaceAll("\"", "").replaceAll("}", "");
+        return state;
+    }
 }

@@ -85,9 +85,9 @@ public class pcapQueryThread extends Thread {
 
         //  runJobWithPcapJob();
         //working external process sync
-         runQueryFromCliLinuxProcess();
+        // runQueryFromCliLinuxProcess();
         //uncomment the following when we will have implemented to get dynamically the address of hte yarn server
-       // runQueryFromCliLinuxProcessAsynnc();
+        runQueryFromCliLinuxProcessAsynnc();
 
         setStatus("Finished");
         setEndTime(usefullFunctions.getCurrentNanoTime());
@@ -151,12 +151,13 @@ public class pcapQueryThread extends Thread {
         this.setJobId(pcapQueryAsync.getPcapsLinuxProcessAsync(pcapRequest, idQuery));
     }
 
+    
     public void downloadResultLocally() {  
-        
+         
         try {
             Configuration config = new Configuration();
           SequenceFileIterable seqFile = pcapQueryAsync.readResults(new Path("/tmp/"+this.idQuery), config,FileSystem.get(config));
-          pcapQueryAsync.writeLocally(seqFile, 10,new Path( "/tmp/"+this.idQuery));
+          pcapQueryAsync.writeLocally(seqFile, 1,new Path( "/tmp/"+this.idQuery));
         } catch (IOException ex) {
             Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
         }
