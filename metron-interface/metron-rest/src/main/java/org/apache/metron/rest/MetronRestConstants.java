@@ -72,4 +72,8 @@ public class MetronRestConstants {
 
   public static final String USER_SETTINGS_HBASE_TABLE_SPRING_PROPERTY = "user.settings.table";
   public static final String USER_SETTINGS_HBASE_CF_SPRING_PROPERTY = "user.settings.cf";
+  
+  public static final String TSHARK_PATH_SPRING_PROPERTY = "tshark.path";
+  public static final String YARN_RESSOURCE_MANAGER_URL_SPRING_PROPERTY = "yarn.ressourcemanager.ui.url";
+  public static final String METRON_PCAP_QUERY_SCRIPT_PATH_SPRING_PROPERTY = "metron.pcap.query.script.path";
 }
