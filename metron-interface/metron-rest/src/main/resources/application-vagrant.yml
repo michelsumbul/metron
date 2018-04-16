@@ -52,7 +52,19 @@ storm:
     randomaccess.script.path: /usr/metron/${metron.version}/bin/start_elasticsearch_topology.sh
     batch.script.path: /usr/metron/${metron.version}/bin/start_hdfs_topology.sh
 
+metron:
+  pcap:
+    query:
+      script.path: /usr/metron/${metron.version}/bin/pcap_query.sh
 
+tshark:
+  path: /usr/sbin/tshark
+
+yarn:
+  ressourcemanager:
+    ui:
+      url: http://node1:8088/
+      
 kerberos:
   enabled: false
   principal: metron@EXAMPLE.COM
