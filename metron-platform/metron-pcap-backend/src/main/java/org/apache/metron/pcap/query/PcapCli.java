@@ -152,36 +152,56 @@ public class PcapCli {
         LOGGER.error("Failed to execute query filter job: {}", e.getMessage(), e);
         return -1;
       }
-    } else {
+    } else if ("fixedAsync".equals(jobType)) {
+        FixedCliParser fixedParser = new FixedCliParser(prefixStrategy);
+      FixedCliConfig config = null;
+      String jobId = "";
+      try {
+        config = fixedParser.parse(otherArgs);
+        commonConfig = config;
+      } catch (ParseException | java.text.ParseException e) {
+        System.err.println(e.getMessage());
+        System.err.flush();
+        fixedParser.printHelp();
+        return -1;
+      }
+      if (config.showHelp()) {
+        fixedParser.printHelp();
+        return 0;
+      }
+      Pair<Long, Long> time = timeAsNanosecondsSinceEpoch(config.getStartTime(), config.getEndTime());
+      long startTime = time.getLeft();
+      long endTime = time.getRight();
+
+      try {
+          
+        jobId = jobRunner.queryAsync(
+                new Path(config.getBasePath()),
+                new Path(config.getBaseOutputPath()),
+                startTime,
+                endTime,
+                config.getNumReducers(),
+                config.getFixedFields(),
+                hadoopConf,
+                FileSystem.get(hadoopConf),
+                new FixedPcapFilter.Configurator());
+          System.out.println(jobId);
+        return 0;
+      } catch (IOException | ClassNotFoundException e) {
+        LOGGER.error("Failed to execute fixed Async filter job: {}", e.getMessage(), e);
+        return -1;
+      } catch (InterruptedException e) {
+        LOGGER.error("Failed to execute fixed Async filter job: {}", e.getMessage(), e);
+        return -1;
+      }
+      
+    }
+    
+    else {
       printBasicHelp();
       return -1;
     }
-    try {
-
-      Iterable<List<byte[]>> partitions = Iterables.partition(results, commonConfig.getNumRecordsPerFile());
-      int part = 1;
-      if (partitions.iterator().hasNext()) {
-        for (List<byte[]> data : partitions) {
-          String outFileName = String.format("pcap-data-%s+%04d.pcap", commonConfig.getPrefix(), part++);
-          if(data.size() > 0) {
-            resultsWriter.write(data, outFileName);
-          }
-        }
-      } else {
-        System.out.println("No results returned.");
-      }
-    } catch (IOException e) {
-      LOGGER.error("Unable to write file", e);
-      return -1;
-    } 
-    /*finally {
-      try {
-      //  results.cleanup();
-      } catch(IOException e) {
-        LOGGER.warn("Unable to cleanup files in HDFS", e);
-      }
-
-    }*/
+   
     return 0;
   }
 
