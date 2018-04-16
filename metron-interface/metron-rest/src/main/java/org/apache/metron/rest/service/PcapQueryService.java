@@ -15,11 +15,12 @@
  */
 package org.apache.metron.rest.service;
 
-import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.metron.rest.RestException;
+import org.apache.metron.common.hadoop.SequenceFileIterable;
+import org.apache.metron.rest.model.PcapRequest;
 import org.apache.metron.rest.util.PcapQueryResult;
 
 /**
@@ -27,22 +28,16 @@ import org.apache.metron.rest.util.PcapQueryResult;
  * @author msumbul
  */
 public interface PcapQueryService {
-    
 
-    List<PcapQueryResult>  QueryFilterUtility(String sourceIP,
-            String destinationIP,
-            int sourcePort,
-            int destinationPort,
-            int protocol,
-            long st,
-            long et,
-            String dateformat,
-            Path hdfsPathPcap,
-            String packet_filter,
-            Boolean include_reverse);
-    
-    
 
-    
-    
+    SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs);
+
+    void writeLocally(SequenceFileIterable results, int numRecordsPerFile, Path outputFolder);
+
+    String getPcapsLinuxProcessAsync(PcapRequest pcapRequest, String idQuery);
+
+   void pcapToPDML(Path pcapFile);
+   
+   String pdmlToJson();
+
 }
