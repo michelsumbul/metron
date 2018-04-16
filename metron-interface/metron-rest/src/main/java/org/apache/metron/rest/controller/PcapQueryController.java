@@ -23,12 +23,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.model.PcapRequest;
+import org.apache.metron.rest.service.impl.PcapQueryServiceImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.apache.metron.rest.util.PcapsResponse;
-import org.apache.metron.rest.util.pcapQueryThread;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -42,7 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/pcap")
 public class PcapQueryController {
 
-    List<pcapQueryThread> lPcapQueryThread = new ArrayList<>();
+//    List<pcapQueryThread> lPcapQueryThread = new ArrayList<>();
+    List<PcapQueryServiceImpl> lPcapQueryService = new ArrayList<>();
 
     //Rest api to sumbit complete async pcap query that will not keep an open connection to the client
     @ApiOperation(value = "Submit a pcap job to found specific paquets")
@@ -53,10 +53,12 @@ public class PcapQueryController {
     public ResponseEntity<String> submitAsyncPcapQuery(@RequestBody PcapRequest pcapRequest
     ) throws RestException, IOException {
         System.out.println("We are in submit rest api fonction");
-        pcapQueryThread t = new pcapQueryThread(pcapRequest);
-        lPcapQueryThread.add(t);
-        t.start();
-        return new ResponseEntity<>(t.getIdQuery(), HttpStatus.CREATED);
+
+        PcapQueryServiceImpl query = new PcapQueryServiceImpl(pcapRequest);
+
+        lPcapQueryService.add(query);
+        
+        return new ResponseEntity<>(query.getIdQuery(), HttpStatus.CREATED);
     }
 
     //Get status of a pcap query
@@ -68,37 +70,15 @@ public class PcapQueryController {
     public ResponseEntity<String> getAsyncPcapQueryStatus(@RequestParam(value = "idQuery") String idQuery
     ) throws RestException, IOException {
 
-        pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
-        if (t == null) {
+        PcapQueryServiceImpl query = findQueryInList(idQuery);
+        if (query == null) {
             return new ResponseEntity<>("Not Found", HttpStatus.NOT_FOUND);
         }
 
-        return new ResponseEntity<>(t.getStatus(), HttpStatus.OK);
+        return new ResponseEntity<>(query.getStatus(), HttpStatus.OK);
     }
 
-    @ApiOperation(value = "Get the result of a pcap query")
-    @ApiResponses({
-        @ApiResponse(message = "Return the result of the query running on the backend", code = 200)
-    })
-    @RequestMapping(value = "/pcapqueryfilterasync/result", method = RequestMethod.POST)
-    public ResponseEntity<PcapsResponse> getAsyncPcapQueryResult(@RequestParam(value = "idQuery") String idQuery
-    ) throws RestException, IOException {
-
-        pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
-        
-        if(!t.getStatus().equals("Finished")){
-            return new ResponseEntity<>(new PcapsResponse(), HttpStatus.PROCESSING);
-        }
-        if(t == null){
-            return new ResponseEntity<>(new PcapsResponse(), HttpStatus.NOT_FOUND);
-        }
-        if(t.getPcapsReponse() == null || t.getPcapsReponse().getResponseSize() == 0){
-            return new ResponseEntity<>(new PcapsResponse(), HttpStatus.NO_CONTENT);
-        }
-        return new ResponseEntity<>(t.getPcapsReponse(), HttpStatus.OK);
-    }
-
-        @ApiOperation(value = "Get the result of a pcap query in a Json format")
+    @ApiOperation(value = "Get the result of a pcap query in a Json format")
     @ApiResponses({
         @ApiResponse(message = "Return the result of the query running on the backend in a JSON format", code = 200)
     })
@@ -106,26 +86,24 @@ public class PcapQueryController {
     public ResponseEntity<String> getAsyncPcapQueryResultInJson(@RequestParam(value = "idQuery") String idQuery
     ) throws RestException, IOException {
 
-        pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
-        
-        if(!t.getStatus().equals("Finished")){
+        PcapQueryServiceImpl query = findQueryInList(idQuery);
+
+        if (!query.getStatus().equals("Finished")) {
             return new ResponseEntity<>("", HttpStatus.PROCESSING);
         }
-        if(t == null){
+        if (query == null) {
             return new ResponseEntity<>("", HttpStatus.NOT_FOUND);
         }
-        
-        
-        if(t !=null & t.getStatus().equals("Finished") ){
-            t.downloadResultLocally();  //for complete async
-            return new ResponseEntity<>(t.pdmlToJson(), HttpStatus.OK);
+
+        if (query != null & query.getStatus().equals("Finished")) {
+            query.downloadResultLocally();  //for complete async
+            return new ResponseEntity<>(query.pdmlToJson(), HttpStatus.OK);
         }
-        
+
         return new ResponseEntity<>("Error in the result collection.", HttpStatus.BAD_REQUEST);
-        
+
     }
-    
-    
+
     @ApiOperation(value = "Clear query")
     @ApiResponses({
         @ApiResponse(message = "Clear the result of the query on backendside", code = 200)
@@ -134,9 +112,9 @@ public class PcapQueryController {
     public ResponseEntity<String> clearAsyncPcapQueryResult(@RequestParam(value = "idQuery") String idQuery
     ) throws RestException, IOException {
 
-        pcapQueryThread t = pcapQueryThread.findQueryInList(lPcapQueryThread, idQuery);
-        lPcapQueryThread.remove(t);
-        t.setPcapsReponse(new PcapsResponse());
+        PcapQueryServiceImpl query = findQueryInList(idQuery);
+        lPcapQueryService.remove(query);
+        query.setPcapsReponse(new PcapsResponse());
 
         return new ResponseEntity<>("Done", HttpStatus.OK);
     }
@@ -147,12 +125,23 @@ public class PcapQueryController {
     })
     @RequestMapping(value = "/pcapqueryfilterasync/listquery", method = RequestMethod.POST)
     public ResponseEntity<List<String>> getListQueries() throws RestException, IOException {
+        List<String> lQueries = new ArrayList<>();
+        for (PcapQueryServiceImpl t : lPcapQueryService) {
+            lQueries.add(t.getIdQuery());
+        }
 
-        return new ResponseEntity<>(pcapQueryThread.getListQueries(lPcapQueryThread), HttpStatus.OK);
+        return new ResponseEntity<>(lQueries, HttpStatus.OK);
     }
 
-   
+    public PcapQueryServiceImpl findQueryInList(String idQuery) {
 
+        for (PcapQueryServiceImpl t : lPcapQueryService) {
+            if (t.getIdQuery().equals(idQuery)) {
+                return t;
+            }
+        }
+        return null;
+    }
 
     private static boolean isValidPort(String port) {
         if (port != null && !port.equals("")) {
