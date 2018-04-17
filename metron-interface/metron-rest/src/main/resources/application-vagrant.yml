@@ -63,7 +63,8 @@ tshark:
 yarn:
   ressourcemanager:
     ui:
-      url: http://node1:8088/
+      url: node1
+      port: 8088
       
 kerberos:
   enabled: false
