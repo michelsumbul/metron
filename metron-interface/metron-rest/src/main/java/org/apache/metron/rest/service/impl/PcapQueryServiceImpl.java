@@ -51,7 +51,6 @@ import org.apache.metron.rest.model.PcapResponse;
 import org.springframework.stereotype.Service;
 import org.apache.metron.rest.util.Pdml;
 import org.apache.metron.rest.util.ResultsWriter;
-import org.apache.metron.rest.util.pcapQueryThread;
 import org.apache.metron.rest.util.usefullFunctions;
 import static org.apache.metron.rest.util.usefullFunctions.getCommandList;
 import static org.apache.metron.rest.util.usefullFunctions.getCurrentNanoTime;
@@ -163,7 +162,7 @@ public class PcapQueryServiceImpl {
                 return jobId;
             }
         } catch (IOException | InterruptedException ex) {
-            Logger.getLogger(PcapQueryServiceAsyncImpl.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         return "Error in get the jobID of the mapreduce pcap search program.";
@@ -176,7 +175,7 @@ public class PcapQueryServiceImpl {
             SequenceFileIterable seqFile = readResults(new Path(this.getOutPath()), config, FileSystem.get(config));
             writeLocally(seqFile, 100, new Path(this.getOutPath()));
         } catch (IOException ex) {
-            Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         List<Path> lPath = usefullFunctions.getAllFiles(new File(this.outPath));
@@ -249,7 +248,7 @@ public class PcapQueryServiceImpl {
             }
         } catch (IOException e) {
 
-            Logger.getLogger(PcapQueryServiceAsyncImpl.class.getName()).log(Level.SEVERE, null, e);
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, e);
 
         }
     }
@@ -277,7 +276,7 @@ public class PcapQueryServiceImpl {
                 process.destroy();
 
             } catch (IOException | InterruptedException ex) {
-                Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -294,7 +293,7 @@ public class PcapQueryServiceImpl {
             return json;
 
         } catch (IOException ex) {
-            Logger.getLogger(pcapQueryThread.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
         return "conversion error";
     }
@@ -324,7 +323,7 @@ public class PcapQueryServiceImpl {
                     
 
         } catch (IOException ex) {
-            Logger.getLogger(PcapQueryServiceAsyncImpl.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     /**
