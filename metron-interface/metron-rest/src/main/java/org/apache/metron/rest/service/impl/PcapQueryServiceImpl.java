@@ -41,13 +41,13 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.apache.metron.common.hadoop.SequenceFileIterable;
 import org.apache.metron.rest.MetronRestConstants;
 import org.apache.metron.rest.model.PcapRequest;
 import org.apache.metron.rest.model.PcapResponse;
+import org.apache.metron.rest.service.PcapQueryService;
 import org.springframework.stereotype.Service;
 import org.apache.metron.rest.util.Pdml;
 import org.apache.metron.rest.util.ResultsWriter;
@@ -57,12 +57,13 @@ import static org.apache.metron.rest.util.usefullFunctions.getCurrentNanoTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 
+
 /**
  *
  * @author msumbul
  */
 @Service
-public class PcapQueryServiceImpl {
+public class PcapQueryServiceImpl implements PcapQueryService{
 
     private Configuration configuration;
     private String outPath;
@@ -72,13 +73,9 @@ public class PcapQueryServiceImpl {
     private PcapRequest pcapRequest;
     private Path localPcapFile;
 
-    
+    @Autowired
     private Environment environment;
 
-    @Autowired
-    public void setEnvironment(final Environment environment) {
-        this.environment = environment;
-    }
 
     public PcapQueryServiceImpl() {
 
@@ -90,8 +87,8 @@ public class PcapQueryServiceImpl {
         this.pcapReponse = new PcapResponse();
         this.outPath = "/tmp/" + String.valueOf(getSubmitTime());
         this.pcapReponse.setStatus("Created");
-        runQueryFromCliLinuxProcessAsync();
-        updateYarnJobStatusRest();
+        //runQueryFromCliLinuxProcessAsync();
+        //updateYarnJobStatusRest();
         
 
     }
@@ -99,15 +96,20 @@ public class PcapQueryServiceImpl {
     public PcapQueryServiceImpl(Configuration configuration) {
         this.configuration = configuration;
     }
+    
+    @Override
+    public int runQueryFromCliLinuxProcessAsync() {
 
-    private void runQueryFromCliLinuxProcessAsync() {
-
-        this.getPcapReponse().setIdQuery(getPcapsLinuxProcessAsync().replace("job", "application"));
+        String id =  getPcapsLinuxProcessAsync().replace("job", "application");
+        this.getPcapReponse().setIdQuery(id);
+        updateYarnJobStatusRest();
+        return 0;
     }
 
-    private String getPcapsLinuxProcessAsync() {
+    @Override
+    public String getPcapsLinuxProcessAsync() {
       
-        //String pcapQueryScript = environment.getProperty(MetronRestConstants.METRON_PCAP_QUERY_SCRIPT_PATH_SPRING_PROPERTY);
+      //  String pcapQueryScript = environment.getProperty(MetronRestConstants.METRON_PCAP_QUERY_SCRIPT_PATH_SPRING_PROPERTY);
 
         
         String cmdToExec = "/usr/hcp/current/metron/bin/pcap_query.sh fixedAsync ";
@@ -146,13 +148,14 @@ public class PcapQueryServiceImpl {
             pb.command(lCmd);
             process = pb.start();
             process.waitFor();
-            pb.directory(new File(this.getOutPath()));
+         //   pb.directory(new File(this.getOutPath()));
 
             lCmd = getCommandList(cmdToExec);
             System.out.println(lCmd);
             pb.command(lCmd);
 
             process = pb.start();
+            
             BufferedReader subProcessInputReader
                     = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
@@ -168,6 +171,7 @@ public class PcapQueryServiceImpl {
         return "Error in get the jobID of the mapreduce pcap search program.";
     }
 
+    @Override
     public void downloadResultLocally() {
 
         try {
@@ -191,7 +195,8 @@ public class PcapQueryServiceImpl {
 
     }
     
-    private void deleteLocalData(File f){
+    @Override
+    public void deleteLocalData(File f){
         
         if(f.isFile()){
             f.delete();
@@ -205,6 +210,7 @@ public class PcapQueryServiceImpl {
         }
     }
     
+    @Override
     public void deleteHDFSResult(){
         try {
             FileSystem fs = FileSystem.get(new Configuration());
@@ -213,23 +219,31 @@ public class PcapQueryServiceImpl {
             Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    private SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs) throws IOException {
+    
+    @Override
+    public SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs)  {
 
-        List<Path> files = new ArrayList<>();
-        //for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
-        for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
-            Path p = it.next().getPath();
-            if (p.getName().equals("_SUCCESS")) {
-                fs.delete(p, false);
-                continue;
+        try {
+            List<Path> files = new ArrayList<>();
+            //for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, false); it.hasNext();) {
+            for (RemoteIterator<LocatedFileStatus> it = fs.listFiles(outputPath, true); it.hasNext();) {
+                Path p = it.next().getPath();
+                if (p.getName().equals("_SUCCESS")) {
+                    fs.delete(p, false);
+                    continue;
+                }
+                files.add(p);
             }
-            files.add(p);
+            Collections.sort(files, (o1, o2) -> o1.getName().compareTo(o2.getName()));
+            return new SequenceFileIterable(files, config);
+        } catch (IOException ex) {
+            Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
-        Collections.sort(files, (o1, o2) -> o1.getName().compareTo(o2.getName()));
-        return new SequenceFileIterable(files, config);
+        return null;
     }
 
-    private void writeLocally(SequenceFileIterable results, int numRecordsPerFile, Path outputFolder) {
+    @Override
+    public void writeLocally(SequenceFileIterable results, int numRecordsPerFile, Path outputFolder) {
         ResultsWriter resultsWriter = new ResultsWriter();
         try {
 
@@ -253,21 +267,23 @@ public class PcapQueryServiceImpl {
         }
     }
 
-    private void pcapToPDML(Path pcapFile) {
+    @Override
+    public int pcapToPDML(Path pcapFile) {
 
         if (pcapFile != null) {
             try {
                 String cmd;
                 ProcessBuilder pb = new ProcessBuilder();
                 Process process;
-               
-                //   String tsharkPath = environment.getProperty(MetronRestConstants.TSHARK_PATH_SPRING_PROPERTY);
-                //   cmd = tsharkPath + " -r " + pcapFile.toString() + " -T pdml";
-                cmd = "/usr/sbin/tshark -r " + pcapFile.toString() + " -T pdml";
+               System.out.println("Env var: " + MetronRestConstants.TSHARK_PATH_SPRING_PROPERTY);
+                   String tsharkPath = environment.getProperty(MetronRestConstants.TSHARK_PATH_SPRING_PROPERTY);
+                   cmd = tsharkPath + " -r " + pcapFile.toString() + " -T pdml";
+               // cmd = "/usr/sbin/tshark -r " + pcapFile.toString() + " -T pdml";
                 System.out.println(cmd);
                 List<String> lCmd = getCommandList(cmd);
                 lCmd = getCommandList(cmd);
-                pb.directory(new File(this.getOutPath()));
+                
+               // pb.directory(new File(this.getOutPath()));
                 pb.command(lCmd);
                 pb.redirectOutput(new File(pcapFile.getParent().toString() + "/" + this.getPcapReponse().getIdQuery() + ".pdml"));
                 pb.redirectError(new File(pcapFile.getParent().toString() + "/" + this.getPcapReponse().getIdQuery() + ".error"));
@@ -277,11 +293,14 @@ public class PcapQueryServiceImpl {
 
             } catch (IOException | InterruptedException ex) {
                 Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                return 1;
             }
         }
+        return 0;
     }
 
-    private String pdmlToJson() {
+    @Override
+    public String pdmlToJson() {
 
         try {
             File f = new File(this.getOutPath() + "/" + this.getPcapReponse().getIdQuery() + ".pdml");
@@ -298,7 +317,8 @@ public class PcapQueryServiceImpl {
         return "conversion error";
     }
 
-    public  void updateYarnJobStatusRest() {
+    @Override
+    public int updateYarnJobStatusRest() {
         
         try {
             HttpClient httpclient = HttpClientBuilder.create().build();
@@ -325,6 +345,7 @@ public class PcapQueryServiceImpl {
         } catch (IOException ex) {
             Logger.getLogger(PcapQueryServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
+        return 0;
     }
     /**
      * @return the configuration
