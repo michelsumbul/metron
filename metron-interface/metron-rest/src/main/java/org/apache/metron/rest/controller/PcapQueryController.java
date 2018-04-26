@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PcapQueryController {
 
 //    List<pcapQueryThread> lPcapQueryThread = new ArrayList<>();
-    List<PcapQueryServiceImpl> lPcapQueryService = new ArrayList<>();
+    private List<PcapQueryServiceImpl> lPcapQueryService = new ArrayList<>();
 
     //Rest api to sumbit complete async pcap query that will not keep an open connection to the client
     @ApiOperation(value = "Submit a pcap job to found specific paquets")
@@ -55,9 +55,10 @@ public class PcapQueryController {
         System.out.println("We are in submit rest api fonction");
 
         PcapQueryServiceImpl query = new PcapQueryServiceImpl(pcapRequest);
-        
-        lPcapQueryService.add(query);
-        
+
+        getlPcapQueryService().add(query);
+        query.runQueryFromCliLinuxProcessAsync();
+
         return new ResponseEntity<>(query.getPcapReponse(), HttpStatus.CREATED);
     }
 
@@ -71,11 +72,11 @@ public class PcapQueryController {
     ) throws RestException, IOException {
 
         PcapQueryServiceImpl query = findQueryInList(idQuery);
-        query.updateYarnJobStatusRest();
+
         if (query == null) {
             return new ResponseEntity<>(new PcapResponse(), HttpStatus.NOT_FOUND);
         }
-
+        query.updateYarnJobStatusRest();
         return new ResponseEntity<>(query.getPcapReponse(), HttpStatus.OK);
     }
 
@@ -91,7 +92,7 @@ public class PcapQueryController {
         query.updateYarnJobStatusRest();
         if (!query.getPcapReponse().getStatus().equals("FINISHED")) {
             return new ResponseEntity<>(new PcapResponse(), HttpStatus.PROCESSING);
-          
+
         }
         if (query == null) {
             return new ResponseEntity<>(new PcapResponse(), HttpStatus.NOT_FOUND);
@@ -115,10 +116,13 @@ public class PcapQueryController {
     ) throws RestException, IOException {
 
         PcapQueryServiceImpl query = findQueryInList(idQuery);
-        query.deleteHDFSResult();
-        lPcapQueryService.remove(query);
-        query.setPcapResponse(new PcapResponse());
-
+        if (query == null) {
+            return new ResponseEntity<>("Not Found", HttpStatus.NOT_FOUND);
+        } else {
+            query.deleteHDFSResult();
+            getlPcapQueryService().remove(query);
+            query.setPcapResponse(new PcapResponse());
+        }
         return new ResponseEntity<>("Done", HttpStatus.OK);
     }
 
@@ -129,7 +133,7 @@ public class PcapQueryController {
     @RequestMapping(value = "/pcapqueryfilterasync/listquery", method = RequestMethod.POST)
     public ResponseEntity<List<String>> getListQueries() throws RestException, IOException {
         List<String> lQueries = new ArrayList<>();
-        for (PcapQueryServiceImpl t : lPcapQueryService) {
+        for (PcapQueryServiceImpl t : getlPcapQueryService()) {
             lQueries.add(t.getPcapReponse().getIdQuery());
         }
 
@@ -138,7 +142,7 @@ public class PcapQueryController {
 
     public PcapQueryServiceImpl findQueryInList(String idQuery) {
 
-        for (PcapQueryServiceImpl t : lPcapQueryService) {
+        for (PcapQueryServiceImpl t : getlPcapQueryService()) {
             if (t.getPcapReponse().getIdQuery().equals(idQuery)) {
                 return t;
             }
@@ -156,6 +160,20 @@ public class PcapQueryController {
             }
         }
         return false;
+    }
+
+    /**
+     * @return the lPcapQueryService
+     */
+    public List<PcapQueryServiceImpl> getlPcapQueryService() {
+        return lPcapQueryService;
+    }
+
+    /**
+     * @param lPcapQueryService the lPcapQueryService to set
+     */
+    public void setlPcapQueryService(List<PcapQueryServiceImpl> lPcapQueryService) {
+        this.lPcapQueryService = lPcapQueryService;
     }
 
 }
