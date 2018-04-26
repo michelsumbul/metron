@@ -15,13 +15,12 @@
  */
 package org.apache.metron.rest.service;
 
-import java.util.List;
+import java.io.File;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.metron.common.hadoop.SequenceFileIterable;
 import org.apache.metron.rest.model.PcapRequest;
-import org.apache.metron.rest.util.PcapQueryResult;
 
 /**
  *
@@ -29,15 +28,25 @@ import org.apache.metron.rest.util.PcapQueryResult;
  */
 public interface PcapQueryService {
 
+    
+    int runQueryFromCliLinuxProcessAsync();
 
     SequenceFileIterable readResults(Path outputPath, Configuration config, FileSystem fs);
 
     void writeLocally(SequenceFileIterable results, int numRecordsPerFile, Path outputFolder);
 
-    String getPcapsLinuxProcessAsync(PcapRequest pcapRequest, String idQuery);
+    String getPcapsLinuxProcessAsync();
 
-   void pcapToPDML(Path pcapFile);
-   
-   String pdmlToJson();
+    int pcapToPDML(Path pcapFile);
+
+    String pdmlToJson();
+
+    int updateYarnJobStatusRest();
+
+    void downloadResultLocally();
+
+    void deleteLocalData(File f);
+
+    void deleteHDFSResult();
 
 }
